@@ -50,23 +50,34 @@ class JobStatus(BaseModel):
 
 # Helper functions
 def create_job(job_id: str, filename: str):
-    """Create a new job in Redis"""
+    """Create a new job in Redis using hash"""
     job_data = {
         "job_id": job_id,
         "status": "queued",
         "filename": filename,
-        "progress": 0,
-        "message": "Job queued for processing"
+        "progress": "0",
+        "message": "Job queued for processing",
+        "retry_count": "0"
     }
-    redis_client.set(f"job:{job_id}", json.dumps(job_data))
+    # Use Redis hash for atomic operations
+    redis_client.hset(f"job:{job_id}", mapping=job_data)
     redis_client.lpush("job_queue", job_id)
     return job_data
 
 def get_job_status(job_id: str) -> Optional[dict]:
-    """Get job status from Redis"""
-    job_data = redis_client.get(f"job:{job_id}")
+    """Get job status from Redis using hash"""
+    job_data = redis_client.hgetall(f"job:{job_id}")
     if job_data:
-        return json.loads(job_data)
+        # Convert progress to float if it exists
+        if "progress" in job_data:
+            job_data["progress"] = float(job_data["progress"])
+        # Parse stems if it exists
+        if "stems" in job_data and job_data["stems"]:
+            try:
+                job_data["stems"] = json.loads(job_data["stems"])
+            except json.JSONDecodeError:
+                job_data["stems"] = []
+        return job_data
     return None
 
 async def download_from_url(url: str, output_path: Path) -> str:

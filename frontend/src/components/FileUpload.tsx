@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { uploadFile } from '../api';
 import { type Job } from '../types';
 
@@ -11,6 +11,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onJobCreated }) => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -60,6 +61,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ onJobCreated }) => {
         message: 'File uploaded successfully',
       });
       setFile(null);
+      // Reset the file input element
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (err) {
       const errorMessage = err instanceof Error
         ? err.message
@@ -88,6 +93,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onJobCreated }) => {
         <input
           type="file"
           id="file-upload"
+          ref={fileInputRef}
           accept=".mp3,.wav,.flac,.m4a,.ogg"
           onChange={handleChange}
           className="hidden"
