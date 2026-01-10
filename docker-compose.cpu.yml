@@ -1,0 +1,14 @@
+# Docker Compose override for CPU-only systems
+# Use this if you don't have an NVIDIA GPU
+#
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.cpu.yml up
+
+version: '3.8'
+
+services:
+  worker:
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
