@@ -38,8 +38,25 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
 
 # Models
+class SeparationParams(BaseModel):
+    model: str = "htdemucs"  # htdemucs, htdemucs_ft, htdemucs_6s, mdx_extra
+    shifts: int = 1  # 0-10, higher = better quality but slower
+    overlap: float = 0.25  # 0.1-0.9, higher = better quality but slower
+    split: bool = True  # Split audio into chunks
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "model": "htdemucs",
+                "shifts": 1,
+                "overlap": 0.25,
+                "split": True
+            }
+        }
+
 class URLSubmission(BaseModel):
     url: HttpUrl
+    params: Optional[SeparationParams] = None
 
 class JobStatus(BaseModel):
     job_id: str
@@ -47,9 +64,10 @@ class JobStatus(BaseModel):
     progress: Optional[float] = None
     message: Optional[str] = None
     stems: Optional[List[str]] = None
+    params: Optional[dict] = None
 
 # Helper functions
-def create_job(job_id: str, filename: str):
+def create_job(job_id: str, filename: str, params: Optional[SeparationParams] = None):
     """Create a new job in Redis using hash"""
     job_data = {
         "job_id": job_id,
@@ -59,6 +77,11 @@ def create_job(job_id: str, filename: str):
         "message": "Job queued for processing",
         "retry_count": "0"
     }
+
+    # Add params if provided
+    if params:
+        job_data["params"] = json.dumps(params.model_dump())
+
     # Use Redis hash for atomic operations
     redis_client.hset(f"job:{job_id}", mapping=job_data)
     redis_client.lpush("job_queue", job_id)
@@ -77,6 +100,12 @@ def get_job_status(job_id: str) -> Optional[dict]:
                 job_data["stems"] = json.loads(job_data["stems"])
             except json.JSONDecodeError:
                 job_data["stems"] = []
+        # Parse params if it exists
+        if "params" in job_data and job_data["params"]:
+            try:
+                job_data["params"] = json.loads(job_data["params"])
+            except json.JSONDecodeError:
+                job_data["params"] = None
         return job_data
     return None
 
@@ -104,11 +133,82 @@ async def download_from_url(url: str, output_path: Path) -> str:
 async def root():
     return {"message": "Stem Splitter API", "version": "1.0.0"}
 
+@app.get("/models")
+async def get_models():
+    """Get available Demucs models and their descriptions"""
+    return {
+        "models": [
+            {
+                "id": "htdemucs",
+                "name": "Hybrid Transformer Demucs",
+                "description": "Default model with excellent quality. Outputs: drums, bass, other, vocals",
+                "stems": 4,
+                "recommended": True
+            },
+            {
+                "id": "htdemucs_ft",
+                "name": "Hybrid Transformer Demucs (Fine-tuned)",
+                "description": "Fine-tuned version with improved quality on specific genres",
+                "stems": 4,
+                "recommended": False
+            },
+            {
+                "id": "htdemucs_6s",
+                "name": "Hybrid Transformer Demucs (6 stems)",
+                "description": "Separates into 6 stems: drums, bass, other, vocals, guitar, piano",
+                "stems": 6,
+                "recommended": False
+            },
+            {
+                "id": "mdx_extra",
+                "name": "MDX Extra",
+                "description": "Alternative model optimized for different characteristics",
+                "stems": 4,
+                "recommended": False
+            }
+        ],
+        "parameters": {
+            "shifts": {
+                "min": 0,
+                "max": 10,
+                "default": 1,
+                "description": "Number of random shifts for higher quality (slower processing)"
+            },
+            "overlap": {
+                "min": 0.1,
+                "max": 0.9,
+                "default": 0.25,
+                "description": "Overlap between chunks (higher = better quality but slower)"
+            },
+            "split": {
+                "default": True,
+                "description": "Split audio into chunks for processing"
+            }
+        }
+    }
+
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    """Upload an audio file for stem separation"""
+async def upload_file(
+    file: UploadFile = File(...),
+    model: str = "htdemucs",
+    shifts: int = 1,
+    overlap: float = 0.25,
+    split: bool = True
+):
+    """Upload an audio file for stem separation with custom parameters"""
     if not file.filename.endswith(('.mp3', '.wav', '.flac', '.m4a', '.ogg')):
         raise HTTPException(status_code=400, detail="Invalid file format. Supported: mp3, wav, flac, m4a, ogg")
+
+    # Validate model
+    valid_models = ["htdemucs", "htdemucs_ft", "htdemucs_6s", "mdx_extra"]
+    if model not in valid_models:
+        raise HTTPException(status_code=400, detail=f"Invalid model. Supported: {', '.join(valid_models)}")
+
+    # Validate parameters
+    if not 0 <= shifts <= 10:
+        raise HTTPException(status_code=400, detail="Shifts must be between 0 and 10")
+    if not 0.1 <= overlap <= 0.9:
+        raise HTTPException(status_code=400, detail="Overlap must be between 0.1 and 0.9")
 
     # Generate unique job ID
     job_id = str(uuid.uuid4())
@@ -119,18 +219,22 @@ async def upload_file(file: UploadFile = File(...)):
         content = await file.read()
         await out_file.write(content)
 
+    # Create separation params
+    params = SeparationParams(model=model, shifts=shifts, overlap=overlap, split=split)
+
     # Create job
-    job_data = create_job(job_id, file.filename)
+    job_data = create_job(job_id, file.filename, params)
 
     return JSONResponse(content={
         "job_id": job_id,
         "filename": file.filename,
+        "params": params.model_dump(),
         "message": "File uploaded successfully"
     })
 
 @app.post("/submit-url")
 async def submit_url(submission: URLSubmission, background_tasks: BackgroundTasks):
-    """Submit a URL for audio download and stem separation"""
+    """Submit a URL for audio download and stem separation with custom parameters"""
     job_id = str(uuid.uuid4())
 
     try:
@@ -143,12 +247,13 @@ async def submit_url(submission: URLSubmission, background_tasks: BackgroundTask
         if original_path.exists():
             original_path.rename(new_path)
 
-        # Create job
-        job_data = create_job(job_id, filename)
+        # Create job with params if provided
+        job_data = create_job(job_id, filename, submission.params)
 
         return JSONResponse(content={
             "job_id": job_id,
             "filename": filename,
+            "params": submission.params.model_dump() if submission.params else None,
             "message": "URL submitted successfully"
         })
     except Exception as e:

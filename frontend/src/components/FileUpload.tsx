@@ -11,7 +11,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ onJobCreated }) => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Separation parameters
+  const [model, setModel] = useState('htdemucs');
+  const [shifts, setShifts] = useState(1);
+  const [overlap, setOverlap] = useState(0.25);
+  const [split, setSplit] = useState(true);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -52,7 +59,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onJobCreated }) => {
     setError(null);
 
     try {
-      const response = await uploadFile(file);
+      const response = await uploadFile(file, { model, shifts, overlap, split });
       onJobCreated({
         job_id: response.job_id,
         filename: response.filename,
@@ -129,6 +136,118 @@ const FileUpload: React.FC<FileUploadProps> = ({ onJobCreated }) => {
           {error}
         </div>
       )}
+
+      {/* Advanced Options */}
+      <div className="border border-gray-200 rounded-xl p-4">
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="w-full flex items-center justify-between text-left font-medium text-gray-700 hover:text-gray-900"
+        >
+          <span>Advanced Options</span>
+          <svg
+            className={`w-5 h-5 transform transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {showAdvanced && (
+          <div className="mt-4 space-y-4">
+            {/* Track Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Number of Tracks to Extract
+              </label>
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="htdemucs">4 Tracks: Drums, Bass, Vocals, Other (Recommended)</option>
+                <option value="htdemucs_ft">4 Tracks: Drums, Bass, Vocals, Other (Fine-tuned)</option>
+                <option value="htdemucs_6s">6 Tracks: Drums, Bass, Vocals, Other, Guitar, Piano</option>
+                <option value="mdx_extra">4 Tracks: Drums, Bass, Vocals, Other (Alternative)</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Choose how many instrument tracks to separate. More tracks = longer processing.
+              </p>
+            </div>
+
+            {/* Quality Slider */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Separation Quality: {shifts === 0 ? 'Fast' : shifts === 1 ? 'Balanced' : shifts <= 3 ? 'High' : 'Maximum'}
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="10"
+                value={shifts}
+                onChange={(e) => setShifts(parseInt(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>Fast (30s)</span>
+                <span>Balanced (1m)</span>
+                <span>High (2m)</span>
+                <span>Max (5m+)</span>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Higher quality takes longer but produces cleaner separation results.
+              </p>
+            </div>
+
+            {/* Precision Slider */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Processing Precision: {overlap <= 0.2 ? 'Standard' : overlap <= 0.4 ? 'Enhanced' : 'Maximum'}
+              </label>
+              <input
+                type="range"
+                min="0.1"
+                max="0.9"
+                step="0.05"
+                value={overlap}
+                onChange={(e) => setOverlap(parseFloat(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>Standard</span>
+                <span>Enhanced</span>
+                <span>Maximum</span>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Higher precision reduces audio artifacts but increases processing time.
+              </p>
+            </div>
+
+            {/* Memory Optimization Toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Memory Optimization</label>
+                <p className="text-xs text-gray-500">Recommended for files longer than 5 minutes</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSplit(!split)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  split ? 'bg-purple-600' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    split ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <button
         type="submit"

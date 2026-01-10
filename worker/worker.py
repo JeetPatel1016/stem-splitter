@@ -140,14 +140,14 @@ def cleanup_on_error(job_id: str, input_file: Path, job_output_dir: Path):
         raise
 
 
-def process_audio_with_timeout(job_id: str, filename: str, timeout: int):
+def process_audio_with_timeout(job_id: str, filename: str, timeout: int, job_params: Optional[dict] = None):
     """Wrapper to run process_audio with timeout"""
     result = {"success": False, "error": None}
     completed = Event()
 
     def run_processing():
         try:
-            process_audio(job_id, filename)
+            process_audio(job_id, filename, job_params)
             result["success"] = True
         except Exception as e:
             result["error"] = str(e)
@@ -169,10 +169,29 @@ def process_audio_with_timeout(job_id: str, filename: str, timeout: int):
         raise Exception(result["error"])
 
 
-def process_audio(job_id: str, filename: str):
-    """Process audio file with Demucs using Python API"""
+def process_audio(job_id: str, filename: str, job_params: Optional[dict] = None):
+    """Process audio file with Demucs using Python API
+
+    Args:
+        job_id: Unique job identifier
+        filename: Name of the audio file
+        job_params: Optional parameters for processing:
+            - model: Model to use (htdemucs, htdemucs_ft, htdemucs_6s, mdx_extra)
+            - shifts: Number of random shifts for higher quality (0-10, default: 1)
+            - overlap: Overlap between chunks (0.1-0.9, default: 0.25)
+            - split: Split audio into chunks (True/False, default: True)
+    """
     input_file = None
     job_output_dir = None
+
+    # Parse job parameters
+    if job_params is None:
+        job_params = {}
+
+    model_name = job_params.get("model", "htdemucs")
+    shifts = int(job_params.get("shifts", 1))
+    overlap = float(job_params.get("overlap", 0.25))
+    split = job_params.get("split", True)
 
     try:
         # Check for shutdown request
@@ -186,7 +205,7 @@ def process_audio(job_id: str, filename: str):
             raise FileNotFoundError(f"Input file not found for job {job_id}")
 
         input_file = input_files[0]
-        logger.info(f"Processing file: {input_file}")
+        logger.info(f"Processing file: {input_file} with model={model_name}, shifts={shifts}, overlap={overlap}")
 
         update_job_status(job_id, "processing", 10, "Starting stem separation...")
 
@@ -195,12 +214,11 @@ def process_audio(job_id: str, filename: str):
         job_output_dir.mkdir(parents=True, exist_ok=True)
 
         with cleanup_on_error(job_id, input_file, job_output_dir):
-            # Load Demucs model (htdemucs - hybrid transformer demucs)
-            # Outputs: drums, bass, other, vocals
-            update_job_status(job_id, "processing", 20, "Loading Demucs model...")
-            logger.info("Loading htdemucs model...")
+            # Load Demucs model
+            update_job_status(job_id, "processing", 20, f"Loading {model_name} model...")
+            logger.info(f"Loading {model_name} model...")
 
-            model = get_model('htdemucs')
+            model = get_model(model_name)
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
             model.to(device)
             logger.info(f"Model loaded on device: {device}")
@@ -220,11 +238,19 @@ def process_audio(job_id: str, filename: str):
                 sr = model.samplerate
 
             update_job_status(job_id, "processing", 40, "Separating audio tracks...")
-            logger.info("Running stem separation...")
+            logger.info(f"Running stem separation with shifts={shifts}, overlap={overlap}...")
 
-            # Apply model
+            # Apply model with custom parameters
             with torch.no_grad():
-                sources = apply_model(model, wav.unsqueeze(0), device=device)[0]
+                sources = apply_model(
+                    model,
+                    wav.unsqueeze(0),
+                    device=device,
+                    shifts=shifts,
+                    overlap=overlap,
+                    split=split,
+                    progress=False
+                )[0]
 
             # Check for shutdown before saving
             if shutdown_requested:
@@ -330,10 +356,18 @@ def main():
                     current_job_id = None
                     continue
 
+                # Extract job parameters if they exist
+                job_params = {}
+                if "params" in job_data:
+                    try:
+                        job_params = json.loads(job_data["params"]) if isinstance(job_data["params"], str) else job_data["params"]
+                    except json.JSONDecodeError:
+                        logger.warning(f"Invalid params format for job {job_id}, using defaults")
+
                 # Process the job with timeout
                 start_time = time.time()
                 try:
-                    process_audio_with_timeout(job_id, filename, JOB_TIMEOUT)
+                    process_audio_with_timeout(job_id, filename, JOB_TIMEOUT, job_params)
                     processing_time = time.time() - start_time
                     logger.info(f"Job {job_id} processed in {processing_time:.2f} seconds")
                 except TimeoutError as e:

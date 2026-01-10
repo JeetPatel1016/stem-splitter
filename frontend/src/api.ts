@@ -10,11 +10,27 @@ const api = axios.create({
   },
 });
 
-export const uploadFile = async (file: File): Promise<APIResponse> => {
+export interface SeparationParams {
+  model?: string;
+  shifts?: number;
+  overlap?: number;
+  split?: boolean;
+}
+
+export const uploadFile = async (file: File, params?: SeparationParams): Promise<APIResponse> => {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await api.post<APIResponse>('/upload', formData, {
+  // Build query params
+  const queryParams = new URLSearchParams();
+  if (params?.model) queryParams.append('model', params.model);
+  if (params?.shifts !== undefined) queryParams.append('shifts', params.shifts.toString());
+  if (params?.overlap !== undefined) queryParams.append('overlap', params.overlap.toString());
+  if (params?.split !== undefined) queryParams.append('split', params.split.toString());
+
+  const url = `/upload${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+
+  const response = await api.post<APIResponse>(url, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -23,8 +39,8 @@ export const uploadFile = async (file: File): Promise<APIResponse> => {
   return response.data;
 };
 
-export const submitURL = async (url: string): Promise<APIResponse> => {
-  const response = await api.post<APIResponse>('/submit-url', { url });
+export const submitURL = async (url: string, params?: SeparationParams): Promise<APIResponse> => {
+  const response = await api.post<APIResponse>('/submit-url', { url, params });
   return response.data;
 };
 
