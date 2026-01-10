@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { submitURL } from '../api';
-import { Job } from '../types';
+import { type Job } from '../types';
 
 interface URLInputProps {
   onJobCreated: (job: Job) => void;
@@ -31,8 +31,13 @@ const URLInput: React.FC<URLInputProps> = ({ onJobCreated }) => {
         message: 'URL submitted successfully',
       });
       setUrl('');
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to submit URL');
+    } catch (err) {
+      const errorMessage = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'response' in err && typeof err.response === 'object' && err.response !== null && 'data' in err.response && typeof err.response.data === 'object' && err.response.data !== null && 'detail' in err.response.data
+          ? String(err.response.data.detail)
+          : 'Failed to submit URL';
+      setError(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -66,7 +71,7 @@ const URLInput: React.FC<URLInputProps> = ({ onJobCreated }) => {
       <button
         type="submit"
         disabled={!url.trim() || submitting}
-        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-4 px-6 rounded-xl hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105"
+        className="w-full bg-linear-to-r from-purple-600 to-pink-600 text-white font-semibold py-4 px-6 rounded-xl hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105"
       >
         {submitting ? (
           <span className="flex items-center justify-center">

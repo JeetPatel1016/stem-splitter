@@ -1,12 +1,12 @@
-import React, { useState, useCallback } from 'react';
-import FileUpload from './components/FileUpload';
-import URLInput from './components/URLInput';
-import JobStatus from './components/JobStatus';
-import { Job } from './types';
+import { useState, useCallback } from "react";
+import FileUpload from "./components/FileUpload";
+import URLInput from "./components/URLInput";
+import JobStatus from "./components/JobStatus";
+import { type Job } from "./types";
 
 function App() {
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [activeTab, setActiveTab] = useState<'upload' | 'url'>('upload');
+  const [activeTab, setActiveTab] = useState<"upload" | "url">("upload");
 
   const addJob = useCallback((job: Job) => {
     setJobs((prev) => [job, ...prev]);
@@ -14,9 +14,7 @@ function App() {
 
   const updateJob = useCallback((jobId: string, updates: Partial<Job>) => {
     setJobs((prev) =>
-      prev.map((job) =>
-        job.job_id === jobId ? { ...job, ...updates } : job
-      )
+      prev.map((job) => (job.job_id === jobId ? { ...job, ...updates } : job))
     );
   }, []);
 
@@ -25,14 +23,13 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-500 via-pink-500 to-red-500">
+    <div className="min-h-screen bg-linear-to-br from-purple-500 via-pink-500 to-red-500">
       <div className="container mx-auto px-4 py-8">
         <header className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-white mb-4">
-            🎵 Stem Splitter
-          </h1>
+          <h1 className="text-5xl font-bold text-white mb-4">Stem Splitter</h1>
           <p className="text-xl text-white opacity-90">
-            Separate your music into individual tracks - vocals, drums, bass, and more
+            Separate your music into individual tracks - vocals, drums, bass,
+            and more
           </p>
         </header>
 
@@ -42,21 +39,21 @@ function App() {
             {/* Tab Buttons */}
             <div className="flex gap-4 mb-6 border-b border-gray-200">
               <button
-                onClick={() => setActiveTab('upload')}
+                onClick={() => setActiveTab("upload")}
                 className={`pb-4 px-4 font-semibold transition-colors ${
-                  activeTab === 'upload'
-                    ? 'text-purple-600 border-b-2 border-purple-600'
-                    : 'text-gray-500 hover:text-gray-700'
+                  activeTab === "upload"
+                    ? "text-purple-600 border-b-2 border-purple-600"
+                    : "text-gray-500 hover:text-gray-700"
                 }`}
               >
                 Upload File
               </button>
               <button
-                onClick={() => setActiveTab('url')}
+                onClick={() => setActiveTab("url")}
                 className={`pb-4 px-4 font-semibold transition-colors ${
-                  activeTab === 'url'
-                    ? 'text-purple-600 border-b-2 border-purple-600'
-                    : 'text-gray-500 hover:text-gray-700'
+                  activeTab === "url"
+                    ? "text-purple-600 border-b-2 border-purple-600"
+                    : "text-gray-500 hover:text-gray-700"
                 }`}
               >
                 From URL
@@ -64,7 +61,7 @@ function App() {
             </div>
 
             {/* Tab Content */}
-            {activeTab === 'upload' ? (
+            {activeTab === "upload" ? (
               <FileUpload onJobCreated={addJob} />
             ) : (
               <URLInput onJobCreated={addJob} />

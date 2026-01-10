@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { getJobStatus, downloadStem, deleteJob } from '../api';
-import { Job } from '../types';
+import { type Job } from '../types';
 
 interface JobStatusProps {
   job: Job;
@@ -9,11 +9,8 @@ interface JobStatusProps {
 }
 
 const JobStatus: React.FC<JobStatusProps> = ({ job, onUpdate, onRemove }) => {
-  const [polling, setPolling] = useState(true);
-
   useEffect(() => {
     if (job.status === 'completed' || job.status === 'failed') {
-      setPolling(false);
       return;
     }
 
@@ -21,10 +18,6 @@ const JobStatus: React.FC<JobStatusProps> = ({ job, onUpdate, onRemove }) => {
       try {
         const status = await getJobStatus(job.job_id);
         onUpdate(job.job_id, status);
-
-        if (status.status === 'completed' || status.status === 'failed') {
-          setPolling(false);
-        }
       } catch (error) {
         console.error('Failed to fetch job status:', error);
       }
@@ -104,7 +97,7 @@ const JobStatus: React.FC<JobStatusProps> = ({ job, onUpdate, onRemove }) => {
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div
-              className="bg-gradient-to-r from-purple-600 to-pink-600 h-2 rounded-full transition-all duration-300"
+              className="bg-linear-to-r from-purple-600 to-pink-600 h-2 rounded-full transition-all duration-300"
               style={{ width: `${job.progress || 0}%` }}
             ></div>
           </div>
@@ -120,7 +113,7 @@ const JobStatus: React.FC<JobStatusProps> = ({ job, onUpdate, onRemove }) => {
                 key={stem}
                 href={downloadStem(job.job_id, stem)}
                 download
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105"
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105"
               >
                 <svg
                   className="w-5 h-5"

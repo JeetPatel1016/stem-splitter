@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { APIResponse, JobStatusResponse } from './types';
+import { type APIResponse, type JobStatusResponse } from './types';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_URL = 'http://localhost:8000';
 
 const api = axios.create({
   baseURL: API_URL,

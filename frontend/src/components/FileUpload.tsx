@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { uploadFile } from '../api';
-import { Job } from '../types';
+import { type Job } from '../types';
 
 interface FileUploadProps {
   onJobCreated: (job: Job) => void;
@@ -60,8 +60,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onJobCreated }) => {
         message: 'File uploaded successfully',
       });
       setFile(null);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to upload file');
+    } catch (err) {
+      const errorMessage = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'response' in err && typeof err.response === 'object' && err.response !== null && 'data' in err.response && typeof err.response.data === 'object' && err.response.data !== null && 'detail' in err.response.data
+          ? String(err.response.data.detail)
+          : 'Failed to upload file';
+      setError(errorMessage);
     } finally {
       setUploading(false);
     }
@@ -122,7 +127,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onJobCreated }) => {
       <button
         type="submit"
         disabled={!file || uploading}
-        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-4 px-6 rounded-xl hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105"
+        className="w-full bg-linear-to-r from-purple-600 to-pink-600 text-white font-semibold py-4 px-6 rounded-xl hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105"
       >
         {uploading ? (
           <span className="flex items-center justify-center">
