@@ -230,6 +230,14 @@ def process_audio(job_id: str, filename: str, job_params: Optional[dict] = None)
             wav, sr = torchaudio.load(str(input_file))
             wav = wav.to(device)
 
+            # Ensure stereo audio (Demucs expects 2 channels)
+            if wav.shape[0] == 1:
+                logger.info("Converting mono audio to stereo")
+                wav = wav.repeat(2, 1)  # Duplicate mono channel to create stereo
+            elif wav.shape[0] > 2:
+                logger.info(f"Converting {wav.shape[0]} channels to stereo")
+                wav = wav[:2, :]  # Take only first 2 channels
+
             # Resample if necessary
             if sr != model.samplerate:
                 logger.info(f"Resampling from {sr}Hz to {model.samplerate}Hz")
