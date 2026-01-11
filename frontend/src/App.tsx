@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { uploadFile, submitURL, getJobStatus, downloadStem } from "./api";
+import FileUpload from "./components/FileUpload";
 
 type ProcessingState = "idle" | "uploading" | "processing" | "complete" | "error";
 
@@ -44,11 +45,11 @@ export default function App() {
   const [numTracks, setNumTracks] = useState("htdemucs");
   const [separationQuality, setSeparationQuality] = useState(1);
   const [processingPrecision, setProcessingPrecision] = useState(1);
-  const [memoryOptimization, setMemoryOptimization] = useState(true);
+  const [memoryOptimization, setMemoryOptimization] = useState(false);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [availableStems, setAvailableStems] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragActive, setDragActive] = useState(false);
 
   const qualityLabels = ["Fast", "Balanced", "High"];
   const precisionLabels = ["Standard", "Enhanced", "Maximum"];
@@ -92,35 +93,6 @@ export default function App() {
     setTimeout(() => clearInterval(pollInterval), 600000);
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFileName(file.name);
-      setProcessingState("uploading");
-      setOverallProgress(0);
-      setErrorMessage("");
-
-      try {
-        const shiftsMap = [0, 1, 5];
-        const overlapMap = [0.25, 0.4, 0.7];
-
-        const response = await uploadFile(file, {
-          model: numTracks,
-          shifts: shiftsMap[separationQuality],
-          overlap: overlapMap[processingPrecision],
-          split: memoryOptimization,
-        });
-
-        setCurrentJobId(response.job_id);
-        setProcessingState("processing");
-        pollJobStatus(response.job_id);
-      } catch (error) {
-        setProcessingState("error");
-        const err = error as { response?: { data?: { detail?: string } } };
-        setErrorMessage(err.response?.data?.detail || "Failed to upload file");
-      }
-    }
-  };
 
   const handleUrlSubmit = async () => {
     if (url.trim()) {
@@ -168,6 +140,33 @@ export default function App() {
     setCurrentJobId(null);
     setAvailableStems([]);
     setErrorMessage("");
+  };
+
+  const handleFileUpload = async (file: File) => {
+    setFileName(file.name);
+    setProcessingState("uploading");
+    setOverallProgress(0);
+    setErrorMessage("");
+
+    try {
+      const shiftsMap = [0, 1, 5];
+      const overlapMap = [0.25, 0.4, 0.7];
+
+      const response = await uploadFile(file, {
+        model: numTracks,
+        shifts: shiftsMap[separationQuality],
+        overlap: overlapMap[processingPrecision],
+        split: memoryOptimization,
+      });
+
+      setCurrentJobId(response.job_id);
+      setProcessingState("processing");
+      pollJobStatus(response.job_id);
+    } catch (error) {
+      setProcessingState("error");
+      const err = error as { response?: { data?: { detail?: string } } };
+      setErrorMessage(err.response?.data?.detail || "Failed to upload file");
+    }
   };
 
   const handleDownloadStem = (stemId: string) => {
@@ -237,24 +236,11 @@ export default function App() {
                   </TabsList>
 
                   <TabsContent value="file" className="mt-0">
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      className="border-2 border-dashed border-border/50 rounded-xl p-12 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 group"
-                    >
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="audio/*"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                      />
-                      <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                        <Upload className="w-8 h-8 text-primary" />
-                      </div>
-                      <p className="text-lg font-medium mb-2">Drop your audio file here</p>
-                      <p className="text-sm text-muted-foreground">or click to browse</p>
-                      <p className="text-xs text-muted-foreground mt-4">Supports MP3, WAV, FLAC, M4A, OGG</p>
-                    </div>
+                    <FileUpload
+                      onFileSelect={handleFileUpload}
+                      dragActive={dragActive}
+                      setDragActive={setDragActive}
+                    />
                   </TabsContent>
 
                   <TabsContent value="url" className="mt-0">
@@ -286,16 +272,17 @@ export default function App() {
                   <h3 className="text-lg font-semibold mb-6 text-center">Processing Parameters</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="num-tracks" className="text-sm font-medium">Number of Tracks to Extract</Label>
-                      <Select value={numTracks} onValueChange={setNumTracks}>
-                        <SelectTrigger id="num-tracks">
-                          <SelectValue placeholder="Select tracks" />
+                      <Label htmlFor="num-tracks" className="text-sm font-medium">Separation Model</Label>
+                      <Select value={numTracks} onValueChange={(value) => value && setNumTracks(value)}>
+                        <SelectTrigger id="num-tracks" className="w-full">
+                          <SelectValue>
+                            {numTracks === "htdemucs" && "Standard (4 stems)"}
+                            {numTracks === "htdemucs_6s" && "Extended (6 stems)"}
+                          </SelectValue>
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="htdemucs">4 Tracks: Drums, Bass, Vocals, Other (Recommended)</SelectItem>
-                          <SelectItem value="htdemucs_ft">4 Tracks: Drums, Bass, Vocals, Other (Fine-tuned)</SelectItem>
-                          <SelectItem value="htdemucs_6s">6 Tracks: Drums, Bass, Vocals, Other, Guitar, Piano</SelectItem>
-                          <SelectItem value="mdx_extra">4 Tracks: Drums, Bass, Vocals, Other (Alternative)</SelectItem>
+                        <SelectContent className="w-full min-w-[280px]">
+                          <SelectItem value="htdemucs">Standard (4 stems)</SelectItem>
+                          <SelectItem value="htdemucs_6s">Extended (6 stems)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
