@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   X,
   Pause,
-  Play
+  Play,
+  Piano
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +63,8 @@ export default function App() {
     { id: "drums", name: "Drums", icon: <Drum className="w-6 h-6" />, color: "from-cyan-500 to-teal-600" },
     { id: "bass", name: "Bass", icon: <Guitar className="w-6 h-6" />, color: "from-pink-500 to-rose-600" },
     { id: "other", name: "Other", icon: <Waves className="w-6 h-6" />, color: "from-amber-500 to-orange-600" },
+    { id: "guitar", name: "Guitar", icon: <Guitar className="w-6 h-6" />, color: "from-lime-500 to-green-600" },
+    { id: "piano", name: "Piano", icon: <Piano className="w-6 h-6" />, color: "from-indigo-500 to-blue-600" },
   ];
 
   const pollJobStatus = async (jobId: string) => {
@@ -468,22 +471,29 @@ export default function App() {
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8"
+                  className={`grid grid-cols-2 gap-4 mt-8 ${numTracks === "htdemucs_6s" ? "md:grid-cols-3" : "md:grid-cols-4"}`}
                 >
-                  {stems.map((stem, index) => (
-                    <motion.div
-                      key={stem.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="bg-muted/30 rounded-xl p-4 text-center"
-                    >
-                      <div className={`w-10 h-10 rounded-lg bg-linear-to-br ${stem.color} flex items-center justify-center mx-auto mb-2 opacity-50`}>
-                        {stem.icon}
-                      </div>
-                      <p className="text-sm font-medium text-muted-foreground">{stem.name}</p>
-                    </motion.div>
-                  ))}
+                  {stems
+                    .filter(stem => {
+                      // For 6-stem model, show all stems
+                      if (numTracks === "htdemucs_6s") return true;
+                      // For 4-stem models, exclude guitar and piano
+                      return !["guitar", "piano"].includes(stem.id);
+                    })
+                    .map((stem, index) => (
+                      <motion.div
+                        key={stem.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="bg-muted/30 rounded-xl p-4 text-center"
+                      >
+                        <div className={`w-10 h-10 rounded-lg bg-linear-to-br ${stem.color} flex items-center justify-center mx-auto mb-2 opacity-50`}>
+                          {stem.icon}
+                        </div>
+                        <p className="text-sm font-medium text-muted-foreground">{stem.name}</p>
+                      </motion.div>
+                    ))}
                 </motion.div>
               )}
             </motion.div>
