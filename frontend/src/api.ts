@@ -49,8 +49,40 @@ export const getJobStatus = async (jobId: string): Promise<JobStatusResponse> =>
   return response.data;
 };
 
-export const downloadStem = (jobId: string, stem: string): string => {
-  return `${API_URL}/download/${jobId}/${stem}`;
+export const downloadStem = async (jobId: string, stem: string): Promise<void> => {
+  // URL encode the stem filename to handle spaces and special characters
+  const encodedStem = encodeURIComponent(stem);
+  const response = await api.get(`/download/${jobId}/${encodedStem}`, {
+    responseType: 'blob',
+  });
+
+  // Create a blob URL and trigger download
+  const blob = new Blob([response.data], { type: 'audio/wav' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = stem; // Use the original filename
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+export const downloadAllStems = async (jobId: string, filename: string): Promise<void> => {
+  const response = await api.get(`/download-all/${jobId}`, {
+    responseType: 'blob',
+  });
+
+  // Create a blob URL and trigger download
+  const blob = new Blob([response.data], { type: 'application/zip' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${filename} - stems.zip`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
 };
 
 export const deleteJob = async (jobId: string): Promise<void> => {

@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { uploadFile, submitURL, getJobStatus, downloadStem } from "./api";
+import { uploadFile, submitURL, getJobStatus, downloadStem, downloadAllStems } from "./api";
 import FileUpload from "./components/FileUpload";
 
 type ProcessingState = "idle" | "uploading" | "processing" | "complete" | "error";
@@ -180,10 +180,25 @@ export default function App() {
     }
   };
 
-  const handleDownloadStem = (stemId: string) => {
+  const handleDownloadStem = async (stemId: string) => {
     if (currentJobId) {
-      const downloadUrl = downloadStem(currentJobId, stemId);
-      window.open(downloadUrl, '_blank');
+      try {
+        await downloadStem(currentJobId, stemId);
+      } catch (error) {
+        console.error('Error downloading stem:', error);
+      }
+    }
+  };
+
+  const handleDownloadAllStems = async () => {
+    if (currentJobId && fileName) {
+      try {
+        // Extract base filename without extension
+        const baseFileName = fileName.replace(/\.[^/.]+$/, '');
+        await downloadAllStems(currentJobId, baseFileName);
+      } catch (error) {
+        console.error('Error downloading all stems:', error);
+      }
     }
   };
 
@@ -426,11 +441,14 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                  {availableStems.map((stemName, index) => {
-                    const stem = stems.find(s => s.id === stemName) || stems.find(s => s.name.toLowerCase() === stemName.toLowerCase()) || stems[index % stems.length];
+                  {availableStems.map((stemFilename, index) => {
+                    // Extract the track type from filename (e.g., "country_35 - Drums.wav" -> "Drums")
+                    const trackType = stemFilename.split(' - ')[1]?.replace('.wav', '') || stemFilename;
+                    const stemName = trackType.toLowerCase();
+                    const stem = stems.find(s => s.id === stemName) || stems.find(s => s.name.toLowerCase() === stemName) || stems[index % stems.length];
                     return (
                       <motion.div
-                        key={stemName}
+                        key={stemFilename}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
@@ -441,17 +459,17 @@ export default function App() {
                             {stem.icon}
                           </div>
                           <div className="flex-1">
-                            <h3 className="font-semibold capitalize">{stemName}</h3>
+                            <h3 className="font-semibold">{trackType}</h3>
                             <p className="text-xs text-muted-foreground">WAV • 44.1kHz • Stereo</p>
                           </div>
                           <div className="flex items-center gap-2">
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => toggleStemPlay(stemName)}
+                              onClick={() => toggleStemPlay(stemFilename)}
                               className="h-9 w-9 rounded-lg"
                             >
-                              {playingStems.includes(stemName) ? (
+                              {playingStems.includes(stemFilename) ? (
                                 <Pause className="w-4 h-4" />
                               ) : (
                                 <Play className="w-4 h-4" />
@@ -461,14 +479,14 @@ export default function App() {
                               variant="outline"
                               size="icon"
                               className="h-9 w-9 rounded-lg"
-                              onClick={() => handleDownloadStem(stemName)}
+                              onClick={() => handleDownloadStem(stemFilename)}
                             >
                               <Download className="w-4 h-4" />
                             </Button>
                           </div>
                         </div>
 
-                        {playingStems.includes(stemName) && (
+                        {playingStems.includes(stemFilename) && (
                           <motion.div
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: "auto" }}
@@ -504,6 +522,7 @@ export default function App() {
                   <Button
                     size="lg"
                     className="px-8"
+                    onClick={handleDownloadAllStems}
                   >
                     <Download className="w-5 h-5 mr-2" />
                     Download All Stems

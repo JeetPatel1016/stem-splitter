@@ -12,6 +12,8 @@ import yt_dlp
 from pathlib import Path
 from typing import Optional, List
 import shutil
+import zipfile
+import tempfile
 
 app = FastAPI(title="Stem Splitter API")
 
@@ -271,7 +273,12 @@ async def get_status(job_id: str):
 
 @app.get("/download/{job_id}/{stem}")
 async def download_stem(job_id: str, stem: str):
-    """Download a specific stem from a completed job"""
+    """Download a specific stem from a completed job
+
+    Args:
+        job_id: The job identifier
+        stem: The stem filename (e.g., "country_35 - Drums.wav")
+    """
     job_data = get_job_status(job_id)
 
     if not job_data:
@@ -280,8 +287,8 @@ async def download_stem(job_id: str, stem: str):
     if job_data["status"] != "completed":
         raise HTTPException(status_code=400, detail="Job not completed yet")
 
-    # Construct file path
-    stem_path = OUTPUT_DIR / job_id / f"{stem}.wav"
+    # The stem parameter is now the full filename
+    stem_path = OUTPUT_DIR / job_id / stem
 
     if not stem_path.exists():
         raise HTTPException(status_code=404, detail="Stem file not found")
@@ -289,8 +296,56 @@ async def download_stem(job_id: str, stem: str):
     return FileResponse(
         path=stem_path,
         media_type="audio/wav",
-        filename=f"{stem}.wav"
+        filename=stem
     )
+
+@app.get("/download-all/{job_id}")
+async def download_all_stems(job_id: str):
+    """Download all stems as a zip file"""
+    job_data = get_job_status(job_id)
+
+    if not job_data:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job_data["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Job not completed yet")
+
+    if not job_data.get("stems"):
+        raise HTTPException(status_code=404, detail="No stems found for this job")
+
+    # Get the base filename from the first stem
+    # e.g., "country song final - Drums.wav" -> "country song final"
+    first_stem = job_data["stems"][0]
+    base_filename = first_stem.split(' - ')[0] if ' - ' in first_stem else "stems"
+
+    # Create a temporary zip file
+    temp_dir = tempfile.gettempdir()
+    zip_filename = f"{base_filename} - stems.zip"
+    zip_path = Path(temp_dir) / f"{job_id}_{zip_filename}"
+
+    try:
+        # Create zip file with all stems
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for stem_filename in job_data["stems"]:
+                stem_path = OUTPUT_DIR / job_id / stem_filename
+                if stem_path.exists():
+                    # Add file to zip with just the filename (no path)
+                    zipf.write(stem_path, arcname=stem_filename)
+
+        if not zip_path.exists():
+            raise HTTPException(status_code=500, detail="Failed to create zip file")
+
+        return FileResponse(
+            path=zip_path,
+            media_type="application/zip",
+            filename=zip_filename,
+            background=BackgroundTasks()  # Clean up temp file after sending
+        )
+    except Exception as e:
+        # Clean up temp file if it exists
+        if zip_path.exists():
+            zip_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail=f"Failed to create zip: {str(e)}")
 
 @app.delete("/job/{job_id}")
 async def delete_job(job_id: str):

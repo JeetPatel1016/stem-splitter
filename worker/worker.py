@@ -284,15 +284,31 @@ def process_audio(job_id: str, filename: str, job_params: Optional[dict] = None)
             stems = []
             stem_names = model.sources  # ['drums', 'bass', 'other', 'vocals']
 
+            # Get original filename without extension for naming output files
+            original_name = Path(filename).stem
+
+            # Capitalize stem names for output
+            stem_display_names = {
+                'drums': 'Drums',
+                'bass': 'Bass',
+                'other': 'Other',
+                'vocals': 'Vocals',
+                'guitar': 'Guitar',
+                'piano': 'Piano'
+            }
+
             for i, (source, name) in enumerate(zip(sources, stem_names)):
-                output_path = job_output_dir / f"{name}.wav"
+                # Format: original_filename - StemType.wav
+                display_name = stem_display_names.get(name, name.capitalize())
+                output_filename = f"{original_name} - {display_name}.wav"
+                output_path = job_output_dir / output_filename
                 save_audio(source.cpu(), output_path, sr)
-                stems.append(name)
-                logger.info(f"Saved {name}.wav")
+                stems.append(output_filename)
+                logger.info(f"Saved {output_filename}")
 
                 # Update progress for each stem saved
                 progress = 70 + (i + 1) / len(stem_names) * 20
-                update_job_status(job_id, "processing", progress, f"Saved {name}.wav")
+                update_job_status(job_id, "processing", progress, f"Saved {output_filename}")
 
             # Delete input file to save space
             logger.info(f"Cleaning up input file: {input_file}")
