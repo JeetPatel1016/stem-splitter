@@ -177,38 +177,29 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="absolute inset-0 bg-gradient-radial from-primary/20 via-background to-background pointer-events-none" />
+    <div className="min-h-screen bg-background overflow-hidden">
+      {/* Static gradient background with spotlight circles */}
+      <div className="fixed inset-0 pointer-events-none">
+        {/* Base gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-background" />
 
-      <header className="relative z-10 border-b border-border/50 backdrop-blur-sm bg-background/50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/20">
-              <Music className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-semibold tracking-tight">StemSplit</span>
-          </div>
-          <nav className="flex items-center gap-6">
-            <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
-            <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Docs</a>
-            <Button variant="outline" size="sm">
-              Sign In
-            </Button>
-          </nav>
-        </div>
-      </header>
+        {/* Static spotlight circles with varied colors and brightness */}
+        <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-emerald-500/20 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 -right-32 w-[700px] h-[700px] bg-cyan-400/15 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 left-1/4 w-[550px] h-[550px] bg-teal-500/18 rounded-full blur-3xl" />
+      </div>
 
-      <main className="relative z-10 max-w-5xl mx-auto px-6 py-16">
+      <main className="relative z-10 max-w-5xl mx-auto px-6 pt-48 pb-16">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-12"
+          className="text-center mb-20"
         >
-          <h1 className="text-5xl md:text-6xl font-bold mb-4 tracking-tight">
-            Split Audio Into <span className="text-primary">Stems</span>
+          <h1 className="text-6xl md:text-7xl font-bold mb-6 tracking-tight">
+            Split Audio Into <span className="bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 bg-clip-text text-transparent">Stems</span>
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
             AI-powered stem separation. Extract vocals, drums, bass, and instrumentals from any audio file in seconds.
           </p>
         </motion.div>
