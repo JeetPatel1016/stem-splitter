@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
@@ -12,7 +12,6 @@ import {
   Loader2,
   CheckCircle2,
   X,
-  Volume2,
   Pause,
   Play
 } from "lucide-react";
@@ -25,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { uploadFile, submitURL, getJobStatus, downloadStem, downloadAllStems } from "./api";
 import FileUpload from "./components/FileUpload";
+import AudioVisualizer from "./components/AudioVisualizer";
 
 type ProcessingState = "idle" | "uploading" | "processing" | "complete" | "error";
 
@@ -50,6 +50,9 @@ export default function App() {
   const [availableStems, setAvailableStems] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [dragActive, setDragActive] = useState(false);
+  const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
+  const analyserRefs = useRef<{ [key: string]: AnalyserNode }>({});
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   const qualityLabels = ["Fast", "Balanced", "High"];
   const precisionLabels = ["Standard", "Enhanced", "Maximum"];
@@ -123,15 +126,90 @@ export default function App() {
     }
   };
 
-  const toggleStemPlay = (stemId: string) => {
-    setPlayingStems((prev) =>
-      prev.includes(stemId)
-        ? prev.filter((id) => id !== stemId)
-        : [...prev, stemId]
-    );
+  const toggleStemPlay = async (stemFilename: string) => {
+    const isPlaying = playingStems.includes(stemFilename);
+
+    if (isPlaying) {
+      // Stop the audio
+      if (audioRefs.current[stemFilename]) {
+        audioRefs.current[stemFilename].pause();
+        audioRefs.current[stemFilename].currentTime = 0;
+      }
+      setPlayingStems((prev) => prev.filter((id) => id !== stemFilename));
+    } else {
+      // Stop all other playing stems
+      playingStems.forEach((playingStem) => {
+        if (audioRefs.current[playingStem]) {
+          audioRefs.current[playingStem].pause();
+          audioRefs.current[playingStem].currentTime = 0;
+        }
+      });
+
+      // Load and play the audio
+      if (!audioRefs.current[stemFilename] && currentJobId) {
+        try {
+          // Fetch the audio file
+          const encodedStem = encodeURIComponent(stemFilename);
+          const response = await fetch(`http://localhost:8000/download/${currentJobId}/${encodedStem}`);
+          const blob = await response.blob();
+          const audioUrl = URL.createObjectURL(blob);
+
+          // Create audio element
+          const audio = new Audio(audioUrl);
+          audio.addEventListener('ended', () => {
+            setPlayingStems((prev) => prev.filter((id) => id !== stemFilename));
+          });
+          audioRefs.current[stemFilename] = audio;
+
+          // Create audio context and analyser for this audio element
+          if (!audioContextRef.current) {
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+          }
+
+          const audioContext = audioContextRef.current;
+          const analyser = audioContext.createAnalyser();
+          analyser.fftSize = 128;
+
+          const source = audioContext.createMediaElementSource(audio);
+          source.connect(analyser);
+          analyser.connect(audioContext.destination);
+
+          analyserRefs.current[stemFilename] = analyser;
+        } catch (error) {
+          console.error('Error loading audio:', error);
+          return;
+        }
+      }
+
+      // Play the audio
+      if (audioRefs.current[stemFilename]) {
+        audioRefs.current[stemFilename].play();
+        setPlayingStems([stemFilename]); // Only this stem is playing
+      }
+    }
   };
 
+  // Clean up audio elements when component unmounts or job changes
+  useEffect(() => {
+    return () => {
+      Object.values(audioRefs.current).forEach(audio => {
+        audio.pause();
+        URL.revokeObjectURL(audio.src);
+      });
+      audioRefs.current = {};
+      analyserRefs.current = {};
+    };
+  }, [currentJobId]);
+
   const resetState = () => {
+    // Stop and clean up all audio
+    Object.values(audioRefs.current).forEach(audio => {
+      audio.pause();
+      URL.revokeObjectURL(audio.src);
+    });
+    audioRefs.current = {};
+    analyserRefs.current = {};
+
     setProcessingState("idle");
     setOverallProgress(0);
     setFileName("");
@@ -486,31 +564,16 @@ export default function App() {
                           </div>
                         </div>
 
-                        {playingStems.includes(stemFilename) && (
+                        {playingStems.includes(stemFilename) && audioRefs.current[stemFilename] && analyserRefs.current[stemFilename] && (
                           <motion.div
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: "auto" }}
-                            className="mt-4 pt-4 border-t border-border/30"
                           >
-                            <div className="flex items-center gap-3">
-                              <Volume2 className="w-4 h-4 text-muted-foreground" />
-                              <div className="flex-1 h-8 bg-muted/30 rounded-lg overflow-hidden flex items-center gap-0.5 px-1">
-                                {Array.from({ length: 40 }).map((_, i) => (
-                                  <motion.div
-                                    key={i}
-                                    className={`w-1 rounded-full bg-linear-to-t ${stem.color}`}
-                                    animate={{
-                                      height: [8, Math.random() * 24 + 8, 8],
-                                    }}
-                                    transition={{
-                                      duration: 0.5,
-                                      repeat: Infinity,
-                                      delay: i * 0.02,
-                                    }}
-                                  />
-                                ))}
-                              </div>
-                            </div>
+                            <AudioVisualizer
+                              audio={audioRefs.current[stemFilename]}
+                              analyser={analyserRefs.current[stemFilename]}
+                              color={stem.color}
+                            />
                           </motion.div>
                         )}
                       </motion.div>
