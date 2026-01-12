@@ -22,6 +22,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { uploadFile, submitURL, getJobStatus, downloadStem } from "./api";
 import FileUpload from "./components/FileUpload";
 
@@ -38,6 +39,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("file");
   const [url, setUrl] = useState("");
   const [fileName, setFileName] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [processingState, setProcessingState] = useState<ProcessingState>("idle");
   const [overallProgress, setOverallProgress] = useState(0);
   const [playingStems, setPlayingStems] = useState<string[]>([]);
@@ -134,14 +136,25 @@ export default function App() {
     setOverallProgress(0);
     setFileName("");
     setUrl("");
+    setSelectedFile(null);
     setPlayingStems([]);
     setCurrentJobId(null);
     setAvailableStems([]);
     setErrorMessage("");
   };
 
-  const handleFileUpload = async (file: File) => {
-    setFileName(file.name);
+  const handleFileSelect = (file: File | null) => {
+    setSelectedFile(file);
+    if (file) {
+      setFileName(file.name);
+    } else {
+      setFileName("");
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile) return;
+
     setProcessingState("uploading");
     setOverallProgress(0);
     setErrorMessage("");
@@ -150,7 +163,7 @@ export default function App() {
       const shiftsMap = [0, 1, 5];
       const overlapMap = [0.25, 0.4, 0.7];
 
-      const response = await uploadFile(file, {
+      const response = await uploadFile(selectedFile, {
         model: numTracks,
         shifts: shiftsMap[separationQuality],
         overlap: overlapMap[processingPrecision],
@@ -226,7 +239,9 @@ export default function App() {
 
                   <TabsContent value="file" className="mt-0">
                     <FileUpload
-                      onFileSelect={handleFileUpload}
+                      onFileSelect={handleFileSelect}
+                      onUpload={handleFileUpload}
+                      selectedFile={selectedFile}
                       dragActive={dragActive}
                       setDragActive={setDragActive}
                     />
@@ -257,66 +272,72 @@ export default function App() {
                   </TabsContent>
                 </Tabs>
 
-                <div className="mt-8 pt-8 border-t border-border/30">
-                  <h3 className="text-lg font-semibold mb-6 text-center">Processing Parameters</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="num-tracks" className="text-sm font-medium">Separation Model</Label>
-                      <Select value={numTracks} onValueChange={(value) => value && setNumTracks(value)}>
-                        <SelectTrigger id="num-tracks" className="w-full">
-                          <SelectValue>
-                            {numTracks === "htdemucs" && "Standard (4 stems)"}
-                            {numTracks === "htdemucs_6s" && "Extended (6 stems)"}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent className="w-full min-w-[280px]">
-                          <SelectItem value="htdemucs">Standard (4 stems)</SelectItem>
-                          <SelectItem value="htdemucs_6s">Extended (6 stems)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                <Accordion className="w-full mt-6">
+                  <AccordionItem value="parameters">
+                    <AccordionTrigger className="text-lg font-semibold hover:no-underline">
+                      Settings
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="mx-3.5 grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="num-tracks" className="text-sm font-medium">Separation Model</Label>
+                          <Select value={numTracks} onValueChange={(value) => value && setNumTracks(value)}>
+                            <SelectTrigger id="num-tracks" className="w-full">
+                              <SelectValue>
+                                {numTracks === "htdemucs" && "Standard (4 stems)"}
+                                {numTracks === "htdemucs_6s" && "Extended (6 stems)"}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="w-full min-w-[280px]">
+                              <SelectItem value="htdemucs">Standard (4 stems)</SelectItem>
+                              <SelectItem value="htdemucs_6s">Extended (6 stems)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                    <div className="space-y-3">
-                      <Label className="text-sm font-medium">Separation Quality</Label>
-                      <div className="px-1">
-                        <input
-                          type="range"
-                          min="0"
-                          max="2"
-                          step="1"
-                          value={separationQuality}
-                          onChange={(e) => setSeparationQuality(Number(e.target.value))}
-                          className="w-full h-2 bg-muted/50 rounded-lg appearance-none cursor-pointer accent-primary"
-                        />
-                        <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                          {qualityLabels.map((label, i) => (
-                            <span key={label} className={separationQuality === i ? "text-primary font-medium" : ""}>{label}</span>
-                          ))}
+                        <div className="space-y-3">
+                          <Label className="text-sm font-medium">Separation Quality</Label>
+                          <div className="px-1">
+                            <input
+                              type="range"
+                              min="0"
+                              max="2"
+                              step="1"
+                              value={separationQuality}
+                              onChange={(e) => setSeparationQuality(Number(e.target.value))}
+                              className="w-full h-2 bg-muted/50 rounded-lg appearance-none cursor-pointer accent-primary"
+                            />
+                            <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                              {qualityLabels.map((label, i) => (
+                                <span key={label} className={separationQuality === i ? "text-primary font-medium" : ""}>{label}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <Label className="text-sm font-medium">Processing Precision</Label>
+                          <div className="px-1">
+                            <input
+                              type="range"
+                              min="0"
+                              max="2"
+                              step="1"
+                              value={processingPrecision}
+                              onChange={(e) => setProcessingPrecision(Number(e.target.value))}
+                              className="w-full h-2 bg-muted/50 rounded-lg appearance-none cursor-pointer accent-primary"
+                            />
+                            <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                              {precisionLabels.map((label, i) => (
+                                <span key={label} className={processingPrecision === i ? "text-primary font-medium" : ""}>{label}</span>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <Label className="text-sm font-medium">Processing Precision</Label>
-                      <div className="px-1">
-                        <input
-                          type="range"
-                          min="0"
-                          max="2"
-                          step="1"
-                          value={processingPrecision}
-                          onChange={(e) => setProcessingPrecision(Number(e.target.value))}
-                          className="w-full h-2 bg-muted/50 rounded-lg appearance-none cursor-pointer accent-primary"
-                        />
-                        <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                          {precisionLabels.map((label, i) => (
-                            <span key={label} className={processingPrecision === i ? "text-primary font-medium" : ""}>{label}</span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               </div>
             </motion.div>
           )}
