@@ -21,7 +21,6 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { uploadFile, submitURL, getJobStatus, downloadStem } from "./api";
 import FileUpload from "./components/FileUpload";
@@ -45,7 +44,6 @@ export default function App() {
   const [numTracks, setNumTracks] = useState("htdemucs");
   const [separationQuality, setSeparationQuality] = useState(1);
   const [processingPrecision, setProcessingPrecision] = useState(1);
-  const [memoryOptimization, setMemoryOptimization] = useState(false);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [availableStems, setAvailableStems] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
@@ -109,7 +107,7 @@ export default function App() {
           model: numTracks,
           shifts: shiftsMap[separationQuality],
           overlap: overlapMap[processingPrecision],
-          split: memoryOptimization,
+          split: true,
         });
 
         setCurrentJobId(response.job_id);
@@ -156,7 +154,7 @@ export default function App() {
         model: numTracks,
         shifts: shiftsMap[separationQuality],
         overlap: overlapMap[processingPrecision],
-        split: memoryOptimization,
+        split: true,
       });
 
       setCurrentJobId(response.job_id);
@@ -316,18 +314,6 @@ export default function App() {
                           ))}
                         </div>
                       </div>
-                    </div>
-
-                    <div className="flex items-center justify-between bg-muted/20 rounded-xl p-4 border border-border/30">
-                      <div className="space-y-1">
-                        <Label htmlFor="memory-optimization" className="text-sm font-medium cursor-pointer">Memory Optimization</Label>
-                        <p className="text-xs text-muted-foreground">Recommended for audio files longer than 5 mins</p>
-                      </div>
-                      <Switch
-                        id="memory-optimization"
-                        checked={memoryOptimization}
-                        onCheckedChange={setMemoryOptimization}
-                      />
                     </div>
                   </div>
                 </div>

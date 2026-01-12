@@ -246,7 +246,19 @@ def process_audio(job_id: str, filename: str, job_params: Optional[dict] = None)
                 sr = model.samplerate
 
             update_job_status(job_id, "processing", 40, "Separating audio tracks...")
-            logger.info(f"Running stem separation with shifts={shifts}, overlap={overlap}...")
+            logger.info(f"Running stem separation with shifts={shifts}, overlap={overlap}, split={split}...")
+
+            # Validate audio length and adjust split parameter if needed
+            # Note: BagOfModels (when shifts > 0) doesn't have valid_length, so check if method exists
+            audio_length = wav.shape[1]
+            if hasattr(model, 'valid_length'):
+                try:
+                    model.valid_length(audio_length)
+                except ValueError as e:
+                    # Audio is too long for the model without splitting
+                    if not split:
+                        logger.warning(f"Audio length {audio_length} exceeds model capacity. Forcing split=True")
+                        split = True
 
             # Apply model with custom parameters
             with torch.no_grad():
